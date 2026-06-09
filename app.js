@@ -1,7 +1,9 @@
 document.addEventListener('DOMContentLoaded',()=>{
   const cfg = window.OpenMeConfig || {};
   const lang = document.documentElement.lang || 'uk';
-  const phoneLabel = lang.startsWith('ru') ? 'Позвонить мастеру' : 'Зателефонувати майстру';
+  const phoneHref = 'tel:+380800301521';
+  const callDescription = lang.startsWith('ru') ? 'Звонки бесплатные' : 'Дзвінки безкоштовні';
+  const phoneLabel = `<span class="mobile-call-main">0 800 301 521</span><span class="mobile-call-sub">${callDescription}</span>`;
   const telegramLabel = 'Telegram';
   const whatsappLabel = 'WhatsApp';
 
@@ -26,11 +28,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Mobile quick-action panel: ensure bottom call button and a top mobile messenger bar
   let existingMobileBar = document.querySelector('.mobile-call-bar');
   if (existingMobileBar) {
-    existingMobileBar.innerHTML = `<a class="btn-call" href="tel:${cfg.phone}">${phoneLabel}</a>`;
+    existingMobileBar.innerHTML = `<a class="btn-call" href="${phoneHref}">${phoneLabel}</a>`;
   } else {
     const mobileBar = document.createElement('div');
     mobileBar.className = 'mobile-call-bar';
-    mobileBar.innerHTML = `<a class="btn-call" href="tel:${cfg.phone}">${phoneLabel}</a>`;
+    mobileBar.innerHTML = `<a class="btn-call" href="${phoneHref}">${phoneLabel}</a>`;
     document.body.appendChild(mobileBar);
   }
 
