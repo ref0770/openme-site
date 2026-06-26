@@ -1,21 +1,3 @@
-// Google tag (gtag.js)
-(function initGoogleAdsTag() {
-  const tagId = 'AW-18272692455';
-  if (document.querySelector('script[src*="googletagmanager.com/gtag/js"]')) return;
-
-  const gtagScript = document.createElement('script');
-  gtagScript.async = true;
-  gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${tagId}`;
-  document.head.appendChild(gtagScript);
-
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  window.gtag = window.gtag || gtag;
-
-  window.gtag('js', new Date());
-  window.gtag('config', tagId);
-})();
-
 document.addEventListener('DOMContentLoaded',()=>{
   const cfg = window.OpenMeConfig || {};
   const lang = document.documentElement.lang || 'uk';
