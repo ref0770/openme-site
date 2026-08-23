@@ -61,8 +61,12 @@ function waitForRecaptcha() {
   }
 
   if (window.grecaptcha && typeof window.grecaptcha.ready === 'function' && typeof window.grecaptcha.execute === 'function') {
+    console.log('DEBUG: calling grecaptcha.ready');
     return new Promise(resolve => {
-      window.grecaptcha.ready(() => resolve(window.grecaptcha));
+      window.grecaptcha.ready(() => {
+        console.log('DEBUG: grecaptcha ready, calling execute');
+        resolve(window.grecaptcha);
+      });
     });
   }
 
@@ -77,7 +81,11 @@ function waitForRecaptcha() {
         return;
       }
 
-      window.grecaptcha.ready(() => resolve(window.grecaptcha));
+      console.log('DEBUG: calling grecaptcha.ready');
+      window.grecaptcha.ready(() => {
+        console.log('DEBUG: grecaptcha ready, calling execute');
+        resolve(window.grecaptcha);
+      });
     }
 
     const script = getExistingRecaptchaScript();
@@ -106,16 +114,32 @@ async function trackPhoneClickConversion() {
     }
 
     const grecaptcha = await waitForRecaptcha();
-    const token = await grecaptcha.execute(RECAPTCHA_SITE_KEY, { action: PHONE_CLICK_ACTION });
-    const response = await fetch(VERIFY_ENDPOINT, {
-      method: 'POST',
-      credentials: 'same-origin',
-      keepalive: true,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ token })
-    });
+
+    let token;
+    try {
+      token = await grecaptcha.execute(RECAPTCHA_SITE_KEY, { action: PHONE_CLICK_ACTION });
+    } catch (err) {
+      console.log('DEBUG: grecaptcha.execute REJECTED:', err);
+      throw err;
+    }
+    console.log('DEBUG: got token, length:', token.length);
+
+    console.log('DEBUG: calling fetch to', VERIFY_ENDPOINT);
+    let response;
+    try {
+      response = await fetch(VERIFY_ENDPOINT, {
+        method: 'POST',
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ token })
+      });
+    } catch (err) {
+      console.log('DEBUG: fetch REJECTED:', err);
+      throw err;
+    }
 
     if (!response.ok) {
       return;
@@ -143,6 +167,7 @@ function attachPhoneClickHandlers() {
 
     link.dataset.phoneClickTrackingAttached = 'true';
     link.addEventListener('click', () => {
+      console.log('DEBUG: phone click detected');
       void trackPhoneClickConversion();
     });
   });
