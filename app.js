@@ -1,4 +1,129 @@
+// TODO: Replace with the public reCAPTCHA v3 site key from Google reCAPTCHA Admin.
+const RECAPTCHA_SITE_KEY = '6Lcj25QtAAAAACtSbAp6sUuvTXSlmPATueXSLm77';
+
+// Same-origin Cloudflare Worker endpoint that verifies reCAPTCHA tokens server-side.
+const VERIFY_ENDPOINT = '/verify-recaptcha';
+
+// TODO: Replace TODO_CONVERSION_LABEL with the Google Ads conversion label.
+const CONVERSION_SEND_TO = 'AW-18284001272/cG34CMW90eYcEPjvvo5E';
+
+// Minimum reCAPTCHA v3 score required before sending the Google Ads conversion.
+const SCORE_THRESHOLD = 0.5;
+
+const PHONE_CLICK_ACTION = 'phone_click';
+let recaptchaScriptPromise = null;
+
+function isRecaptchaConfigured() {
+  return Boolean(RECAPTCHA_SITE_KEY && !RECAPTCHA_SITE_KEY.startsWith('TODO_'));
+}
+
+function isConversionConfigured() {
+  return Boolean(CONVERSION_SEND_TO && !CONVERSION_SEND_TO.includes('TODO_'));
+}
+
+function loadRecaptchaScript() {
+  if (!isRecaptchaConfigured()) {
+    return Promise.reject(new Error('reCAPTCHA site key is not configured'));
+  }
+
+  if (window.grecaptcha && typeof window.grecaptcha.ready === 'function' && typeof window.grecaptcha.execute === 'function') {
+    return Promise.resolve(window.grecaptcha);
+  }
+
+  if (recaptchaScriptPromise) {
+    return recaptchaScriptPromise;
+  }
+
+  recaptchaScriptPromise = new Promise((resolve, reject) => {
+    function resolveWhenReady() {
+      if (!window.grecaptcha || typeof window.grecaptcha.ready !== 'function') {
+        reject(new Error('reCAPTCHA API is unavailable'));
+        return;
+      }
+
+      window.grecaptcha.ready(() => resolve(window.grecaptcha));
+    }
+
+    const existingScript = document.querySelector('script[data-openme-recaptcha], script[src^="https://www.google.com/recaptcha/api.js"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', resolveWhenReady, { once: true });
+      existingScript.addEventListener('error', () => reject(new Error('Failed to load reCAPTCHA API')), { once: true });
+      if (window.grecaptcha) {
+        resolveWhenReady();
+      }
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.openmeRecaptcha = 'true';
+    script.addEventListener('load', resolveWhenReady, { once: true });
+    script.addEventListener('error', () => reject(new Error('Failed to load reCAPTCHA API')), { once: true });
+    document.head.appendChild(script);
+  }).catch(error => {
+    recaptchaScriptPromise = null;
+    throw error;
+  });
+
+  return recaptchaScriptPromise;
+}
+
+async function trackPhoneClickConversion() {
+  try {
+    if (!isRecaptchaConfigured() || !isConversionConfigured() || typeof window.fetch !== 'function') {
+      return;
+    }
+
+    const grecaptcha = await loadRecaptchaScript();
+    const token = await grecaptcha.execute(RECAPTCHA_SITE_KEY, { action: PHONE_CLICK_ACTION });
+    const response = await fetch(VERIFY_ENDPOINT, {
+      method: 'POST',
+      credentials: 'same-origin',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ token })
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const result = await response.json();
+    const score = typeof result.score === 'number' ? result.score : Number(result.score);
+
+    if (result.success === true && score > SCORE_THRESHOLD && typeof window.gtag === 'function') {
+      window.gtag('event', 'conversion', { send_to: CONVERSION_SEND_TO });
+    }
+  } catch (error) {
+    // The phone call must never depend on analytics verification.
+  }
+}
+
+function initPhoneClickTracking() {
+  if (document.documentElement.dataset.phoneClickTrackingAttached === 'true') {
+    return;
+  }
+
+  document.documentElement.dataset.phoneClickTrackingAttached = 'true';
+  document.addEventListener('click', event => {
+    const link = event.target.closest && event.target.closest('a[href^="tel:"]');
+    if (!link) {
+      return;
+    }
+
+    void trackPhoneClickConversion();
+  }, { capture: true });
+
+  void loadRecaptchaScript().catch(() => {});
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
+  initPhoneClickTracking();
+
   const cfg = window.OpenMeConfig || {};
   const lang = document.documentElement.lang || 'uk';
   const phoneHref = 'tel:+380800301521';
