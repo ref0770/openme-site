@@ -11,6 +11,8 @@ const CONVERSION_SEND_TO = 'AW-18284001272/cG34CMW90eYcEPjvvo5E';
 const SCORE_THRESHOLD = 0.5;
 
 const initPhoneClickTracking = (() => {
+console.log('DEBUG: script loaded');
+
 const PHONE_CLICK_ACTION = 'phone_click';
 let recaptchaReadyPromise = null;
 let recaptchaScriptRequested = false;
@@ -130,6 +132,22 @@ async function trackPhoneClickConversion() {
   }
 }
 
+function attachPhoneClickHandlers() {
+  const links = Array.from(document.querySelectorAll('a[href^="tel:"]'));
+  console.log('DEBUG: attachHandlers called, found', links.length, 'links');
+
+  links.forEach(link => {
+    if (link.dataset.phoneClickTrackingAttached === 'true') {
+      return;
+    }
+
+    link.dataset.phoneClickTrackingAttached = 'true';
+    link.addEventListener('click', () => {
+      void trackPhoneClickConversion();
+    });
+  });
+}
+
 return function initPhoneClickTracking() {
   if (document.documentElement.dataset.phoneClickTrackingAttached === 'true') {
     return;
@@ -137,23 +155,13 @@ return function initPhoneClickTracking() {
 
   document.documentElement.dataset.phoneClickTrackingAttached = 'true';
   ensureRecaptchaScript();
-
-  document.addEventListener('click', event => {
-    const link = event.target.closest && event.target.closest('a[href^="tel:"]');
-    if (!link) {
-      return;
-    }
-
-    void trackPhoneClickConversion();
-  }, { capture: true });
+  attachPhoneClickHandlers();
 
   void waitForRecaptcha().catch(() => {});
 };
 })();
 
-document.addEventListener('DOMContentLoaded',()=>{
-  initPhoneClickTracking();
-
+function initOpenMeApp(){
   const cfg = window.OpenMeConfig || {};
   const lang = document.documentElement.lang || 'uk';
   const phoneHref = 'tel:+380800301521';
@@ -524,6 +532,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     a.replaceWith(article);
   });
 
+  initPhoneClickTracking();
+
   // Ensure body doesn't scroll when nav open
   window.addEventListener('beforeunload', ()=>document.body.classList.remove('nav-open'));
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initOpenMeApp);
+} else {
+  initOpenMeApp();
+}
