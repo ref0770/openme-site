@@ -11,7 +11,7 @@ const CONVERSION_SEND_TO = 'AW-18284001272/cG34CMW90eYcEPjvvo5E';
 const SCORE_THRESHOLD = 0.5;
 
 const PHONE_CLICK_ACTION = 'phone_click';
-let recaptchaScriptPromise = null;
+let recaptchaReadyPromise = null;
 
 function isRecaptchaConfigured() {
   return Boolean(RECAPTCHA_SITE_KEY && !RECAPTCHA_SITE_KEY.startsWith('TODO_'));
@@ -21,20 +21,48 @@ function isConversionConfigured() {
   return Boolean(CONVERSION_SEND_TO && !CONVERSION_SEND_TO.includes('TODO_'));
 }
 
-function loadRecaptchaScript() {
+function getExistingRecaptchaScript() {
+  return Array.from(document.scripts).find(script => script.src.includes('recaptcha/api.js'));
+}
+
+function ensureRecaptchaScript() {
+  if (!isRecaptchaConfigured()) {
+    return null;
+  }
+
+  const existingScript = getExistingRecaptchaScript();
+  if (existingScript) {
+    return existingScript;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(RECAPTCHA_SITE_KEY);
+  script.async = true;
+  script.defer = true;
+  script.dataset.openmeRecaptcha = 'true';
+  document.head.appendChild(script);
+
+  return script;
+}
+
+function waitForRecaptcha() {
   if (!isRecaptchaConfigured()) {
     return Promise.reject(new Error('reCAPTCHA site key is not configured'));
   }
 
+  ensureRecaptchaScript();
+
   if (window.grecaptcha && typeof window.grecaptcha.ready === 'function' && typeof window.grecaptcha.execute === 'function') {
-    return Promise.resolve(window.grecaptcha);
+    return new Promise(resolve => {
+      window.grecaptcha.ready(() => resolve(window.grecaptcha));
+    });
   }
 
-  if (recaptchaScriptPromise) {
-    return recaptchaScriptPromise;
+  if (recaptchaReadyPromise) {
+    return recaptchaReadyPromise;
   }
 
-  recaptchaScriptPromise = new Promise((resolve, reject) => {
+  recaptchaReadyPromise = new Promise((resolve, reject) => {
     function resolveWhenReady() {
       if (!window.grecaptcha || typeof window.grecaptcha.ready !== 'function') {
         reject(new Error('reCAPTCHA API is unavailable'));
@@ -44,30 +72,23 @@ function loadRecaptchaScript() {
       window.grecaptcha.ready(() => resolve(window.grecaptcha));
     }
 
-    const existingScript = document.querySelector('script[data-openme-recaptcha], script[src^="https://www.google.com/recaptcha/api.js"]');
-    if (existingScript) {
-      existingScript.addEventListener('load', resolveWhenReady, { once: true });
-      existingScript.addEventListener('error', () => reject(new Error('Failed to load reCAPTCHA API')), { once: true });
-      if (window.grecaptcha) {
-        resolveWhenReady();
-      }
+    const script = ensureRecaptchaScript();
+    if (!script) {
+      reject(new Error('reCAPTCHA script was not added'));
       return;
     }
 
-    const script = document.createElement('script');
-    script.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`;
-    script.async = true;
-    script.defer = true;
-    script.dataset.openmeRecaptcha = 'true';
     script.addEventListener('load', resolveWhenReady, { once: true });
     script.addEventListener('error', () => reject(new Error('Failed to load reCAPTCHA API')), { once: true });
-    document.head.appendChild(script);
+    if (window.grecaptcha) {
+      resolveWhenReady();
+    }
   }).catch(error => {
-    recaptchaScriptPromise = null;
+    recaptchaReadyPromise = null;
     throw error;
   });
 
-  return recaptchaScriptPromise;
+  return recaptchaReadyPromise;
 }
 
 async function trackPhoneClickConversion() {
@@ -76,7 +97,7 @@ async function trackPhoneClickConversion() {
       return;
     }
 
-    const grecaptcha = await loadRecaptchaScript();
+    const grecaptcha = await waitForRecaptcha();
     const token = await grecaptcha.execute(RECAPTCHA_SITE_KEY, { action: PHONE_CLICK_ACTION });
     const response = await fetch(VERIFY_ENDPOINT, {
       method: 'POST',
@@ -109,6 +130,8 @@ function initPhoneClickTracking() {
   }
 
   document.documentElement.dataset.phoneClickTrackingAttached = 'true';
+  ensureRecaptchaScript();
+
   document.addEventListener('click', event => {
     const link = event.target.closest && event.target.closest('a[href^="tel:"]');
     if (!link) {
@@ -118,7 +141,7 @@ function initPhoneClickTracking() {
     void trackPhoneClickConversion();
   }, { capture: true });
 
-  void loadRecaptchaScript().catch(() => {});
+  void waitForRecaptcha().catch(() => {});
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
