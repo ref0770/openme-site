@@ -10,8 +10,10 @@ const CONVERSION_SEND_TO = 'AW-18284001272/cG34CMW90eYcEPjvvo5E';
 // Minimum reCAPTCHA v3 score required before sending the Google Ads conversion.
 const SCORE_THRESHOLD = 0.5;
 
+const initPhoneClickTracking = (() => {
 const PHONE_CLICK_ACTION = 'phone_click';
 let recaptchaReadyPromise = null;
+let recaptchaScriptRequested = false;
 
 function isRecaptchaConfigured() {
   return Boolean(RECAPTCHA_SITE_KEY && !RECAPTCHA_SITE_KEY.startsWith('TODO_'));
@@ -22,10 +24,16 @@ function isConversionConfigured() {
 }
 
 function getExistingRecaptchaScript() {
-  return Array.from(document.scripts).find(script => script.src.includes('recaptcha/api.js'));
+  return Array.from(document.querySelectorAll('script[src*="recaptcha/api.js"]')).find(script => script.src.includes('recaptcha/api.js'));
 }
 
 function ensureRecaptchaScript() {
+  if (recaptchaScriptRequested) {
+    return getExistingRecaptchaScript();
+  }
+
+  recaptchaScriptRequested = true;
+
   if (!isRecaptchaConfigured()) {
     return null;
   }
@@ -50,8 +58,6 @@ function waitForRecaptcha() {
     return Promise.reject(new Error('reCAPTCHA site key is not configured'));
   }
 
-  ensureRecaptchaScript();
-
   if (window.grecaptcha && typeof window.grecaptcha.ready === 'function' && typeof window.grecaptcha.execute === 'function') {
     return new Promise(resolve => {
       window.grecaptcha.ready(() => resolve(window.grecaptcha));
@@ -72,9 +78,9 @@ function waitForRecaptcha() {
       window.grecaptcha.ready(() => resolve(window.grecaptcha));
     }
 
-    const script = ensureRecaptchaScript();
+    const script = getExistingRecaptchaScript();
     if (!script) {
-      reject(new Error('reCAPTCHA script was not added'));
+      reject(new Error('reCAPTCHA script was not requested'));
       return;
     }
 
@@ -124,7 +130,7 @@ async function trackPhoneClickConversion() {
   }
 }
 
-function initPhoneClickTracking() {
+return function initPhoneClickTracking() {
   if (document.documentElement.dataset.phoneClickTrackingAttached === 'true') {
     return;
   }
@@ -142,7 +148,8 @@ function initPhoneClickTracking() {
   }, { capture: true });
 
   void waitForRecaptcha().catch(() => {});
-}
+};
+})();
 
 document.addEventListener('DOMContentLoaded',()=>{
   initPhoneClickTracking();
