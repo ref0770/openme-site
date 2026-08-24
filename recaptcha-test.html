@@ -2,11 +2,11 @@
 <html lang="uk">
 <head>
   <meta charset="utf-8">
-  <title>reCAPTCHA Enterprise — тест гіпотези</title>
-  <script src="https://www.google.com/recaptcha/enterprise.js?render=6Lcj25QtAAAAACtSbAp6sUuvTXSlmPATueXSLm77"></script>
+  <title>reCAPTCHA v3 — тест НОВОГО ключа</title>
+  <script src="https://www.google.com/recaptcha/api.js?render=6LdG3JUtAAAAAJCOZ9uaGVPKRTtFOVJpnbjqbMiQ"></script>
 </head>
 <body>
-  <h1>Тест reCAPTCHA Enterprise</h1>
+  <h1>Тест reCAPTCHA v3 — новий ключ (OpenMe2)</h1>
   <button id="testBtn">Натисни для тесту</button>
   <pre id="output" style="white-space: pre-wrap; background: #f0f0f0; padding: 10px; margin-top: 20px;"></pre>
 
@@ -19,17 +19,16 @@
 
     document.getElementById('testBtn').addEventListener('click', function () {
       log('Клік зафіксовано. typeof grecaptcha: ' + typeof grecaptcha);
-      log('typeof grecaptcha.enterprise: ' + (typeof grecaptcha !== 'undefined' ? typeof grecaptcha.enterprise : 'n/a'));
 
-      if (typeof grecaptcha === 'undefined' || typeof grecaptcha.enterprise === 'undefined') {
-        log('grecaptcha.enterprise ще не завантажився.');
+      if (typeof grecaptcha === 'undefined') {
+        log('grecaptcha ще не завантажився.');
         return;
       }
 
-      grecaptcha.enterprise.ready(function () {
-        log('grecaptcha.enterprise.ready спрацював. Викликаю execute...');
+      grecaptcha.ready(function () {
+        log('grecaptcha.ready спрацював. Викликаю execute...');
 
-        grecaptcha.enterprise.execute('6Lcj25QtAAAAACtSbAp6sUuvTXSlmPATueXSLm77', { action: 'test' })
+        grecaptcha.execute('6LdG3JUtAAAAAJCOZ9uaGVPKRTtFOVJpnbjqbMiQ', { action: 'test' })
           .then(function (token) {
             log('УСПІХ! Токен отримано, довжина: ' + token.length);
           })
