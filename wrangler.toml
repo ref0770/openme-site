@@ -1,0 +1,16 @@
+# Deploy:
+# 1. Replace TODO_RECAPTCHA_SITE_KEY and TODO_CONVERSION_LABEL in app.js.
+# 2. Add the reCAPTCHA secret as a Worker secret:
+#    wrangler secret put RECAPTCHA_SECRET_KEY
+# 3. Deploy this Worker:
+#    wrangler deploy
+
+name = "openme-recaptcha-verify"
+main = "worker/verify-recaptcha.js"
+compatibility_date = "2026-08-23"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+[[routes]]
+pattern = "openme.com.ua/verify-recaptcha"
+zone_name = "openme.com.ua"
